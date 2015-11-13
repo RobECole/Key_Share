@@ -121,7 +121,7 @@ public class User implements Runnable{
 				//response
 				Response response = responseQueue.take();
 				if(response.getUser() == null){
-					
+					responseQueue.put(response);
 				}else if(response.getUser().getName().equals(this.getName())){
 					if(response.getType().equals("SUCCESS")){
 						for(Key key: steamKeys){
@@ -164,6 +164,8 @@ public class User implements Runnable{
 							}
 						}
 					}
+				}else{
+					responseQueue.put(response);
 				}
 				
 				
