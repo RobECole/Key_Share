@@ -12,7 +12,7 @@ public class Server implements Runnable{
 	private BlockingQueue<Response> responseQueue;
 	private List<User> users;
 	
-	public Server(BlockingQueue<Request> requestQueue, BlockingQueue<Response> responseQueue, ArrayList<User> users){
+	public Server(BlockingQueue<Request> requestQueue, BlockingQueue<Response> responseQueue, List<User> users){
 		this.requestQueue = requestQueue;
 		this.responseQueue = responseQueue;
 		timeouts = new HashMap<>();
@@ -52,11 +52,11 @@ public class Server implements Runnable{
 						
 						Calendar cal = Calendar.getInstance(); // creates calendar
 					    cal.setTime(new Date()); // sets calendar time/date
-					    cal.add(Calendar.HOUR_OF_DAY, shareTime); // adds one hour
+					    cal.add(Calendar.MINUTE, shareTime); // adds one hour
 					    Date borrowTime = cal.getTime(); // returns new date object, one hour in the future
 
 				    	response = new Response(userOne, "SUCCESS", borrowTime);
-				    	System.out.println("SUCCESS");
+				    	System.out.println("Server: SUCCESS");
 				    	responseQueue.put(response);
 				    	
 				    	if(timeouts.containsKey(userTwo.getName())){
@@ -73,29 +73,41 @@ public class Server implements Runnable{
 				    	
 					}else{
 						response = new Response(userOne, "FAILED");
-						System.out.println("FAILED");
+						System.out.println("Server: FAILED");
 						responseQueue.put(response);
 					}
 				}else{
 					//check timeouts
+					System.out.println("Server: Checking Timeouts");
 					for (Map.Entry<User, Shared> entry : timeouts.entrySet())
 					{
 						Shared shared = entry.getValue();
 						String key = shared.checkForTimeout();
-						String[] split = key.split(":");
-						response = new Response(entry.getKey(), "TIMEOUT", key);
-						responseQueue.put(response);
-						
-						for(User userOne : users){
-							if(userOne.getName().equals(split[0])){
-								response = new Response(userOne, "RETURN:" + entry.getKey().getName(), split[1]);
-								responseQueue.put(response);
+						System.out.println("Key: " + key);
+						if(!key.equals("")){
+							String split[] = key.split(":");
+							System.out.println("SPLIT 0: " + split[0]);
+							System.out.println("SPLIT 1: " + split[1]);
+							System.out.println("Server: TIMEOUT KEY " + entry.getKey().getName());
+							Response responseT = new Response(entry.getKey(), "TIMEOUT", split[0]);
+							responseQueue.put(responseT);
+							
+							for(User userOne : users){
+								if(key.contains(userOne.getName())){
+									System.out.println("Server: RETURNING KEY " + userOne.getName());
+									Response responseR = new Response(userOne, "RETURN", split[0]);
+									responseQueue.put(responseR);
+									break;
+								}
 							}
+							timeouts.remove(entry.getKey());
 						}
 					}
 					//send nothing back
-					response = new Response(null, "WAIT");
-					responseQueue.put(response);
+					//for(int i = 0; i < users.size(); i++){
+						response = new Response(null, "WAIT");
+						responseQueue.put(response);
+					//}
 				}
 				
 				

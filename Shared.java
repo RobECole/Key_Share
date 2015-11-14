@@ -25,8 +25,8 @@ public class Shared {
 		{
 		    Date date = entry.getValue();
 		    Date currDate = new Date();
-		    if(date.compareTo(currDate) >= 0){
-		    	return entry.getKey();
+		    if(date.compareTo(currDate) <= 0){
+		    	return entry.getKey() + "";
 		    }
 		}
 		return "";

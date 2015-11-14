@@ -75,8 +75,8 @@ public class Key implements Serializable {
 				name + " : " + 
 				owner + " : " + 
 				user + " : " + 
-				purchased.toString() + " : " + 
-				timeout.toString() + " : " + 
+				purchased + " : " + 
+				timeout + " : " + 
 				borrowed;
 		
 	}

@@ -16,14 +16,21 @@ public class User implements Runnable{
 	private List<User> friends;
 	private BlockingQueue<Response> responseQueue;
 	private BlockingQueue<Request> requestQueue;
+	private Scanner reader;
+	private int serverPort;
+	//System.out.println(serverPort);
+	private ServerSocket listenSocket;
 	
-	public User(int id, String name, BlockingQueue<Response> responseQueue, BlockingQueue<Request> requestQueue){
+	public User(int id, String name, BlockingQueue<Response> responseQueue, BlockingQueue<Request> requestQueue, Scanner reader) throws IOException{
 		this.id = id;
 		this.name = name;
 		this.steamKeys = new ArrayList<>();
 		this.friends = new ArrayList<>();
 		this.responseQueue = responseQueue;
 		this.requestQueue = requestQueue;
+		this.reader = reader;
+		this.serverPort = 7896 + id;
+		this.listenSocket = new ServerSocket(serverPort);
 	}
 
 	public String getName() {
@@ -74,56 +81,72 @@ public class User implements Runnable{
 	@Override
 	public void run() {
 		try {
+			String action = "";
+			String friend = "";
+			String keyName = "";
+			int shareTime = 0;
 			while(true){
-				Thread.sleep(5000);
 				//request
-				Scanner reader = new Scanner(System.in);  // Reading from System.in
-				System.out.println(id + "Enter action: ");
-				String action = reader.next();
-				String friend = "";
-				String keyName = "";
-				int shareTime = 0;
-				if(action.equals("SHARE")){
-					if(!friends.isEmpty()){
-						System.out.println(id + "Enter friend: ");
-						friend = reader.next();
-						for(User user: friends){
-							if(user.getName().equals(friend)){
-								if(!steamKeys.isEmpty()){
-									System.out.println(id + "Enter steam key: ");
-									keyName = reader.next();
-									for(Key key: steamKeys){
-										if(key.getName().equals(keyName)){
-											System.out.println(id + "Enter an amount of time to share: ");
-											shareTime = reader.nextInt();
-											Request request = new Request("SHARE", 
-													this, 
-													user, 
-													keyName,
-													shareTime
-													);
-											requestQueue.put(request);
-											break;
+				if(id == 0){
+					System.out.println(id + " Enter action: ");
+					action = reader.next();
+					friend = "";
+					keyName = "";
+					shareTime = 0;
+					if(action.contains("SHARE")){
+						System.out.println(id + " SHARE");
+						if(!friends.isEmpty()){
+							System.out.println(id + " Enter friend: ");
+							friend = reader.next();
+							System.out.println(id + " Looking for " + friend);
+							for(User user: friends){
+								if(user.getName().contains(friend)){
+									System.out.println(id + " Found Friend");
+									if(!steamKeys.isEmpty()){
+										System.out.println(id + " Enter steam key: ");
+										keyName = reader.next();
+										System.out.println(id + " Looking for Steam Key " + keyName);
+										for(Key key: steamKeys){
+											if(key.getName().equals(keyName)){
+												System.out.println(id + " Found Key");
+												System.out.println(id + " Enter an amount of time to share (Minutes): ");
+												shareTime = reader.nextInt();
+												Request request = new Request("SHARE", 
+														this, 
+														user, 
+														keyName,
+														shareTime
+														);
+												requestQueue.put(request);
+												break;
+											}
 										}
+										break;
 									}
-									break;
 								}
 							}
+							
 						}
-						
+					}else if(action.contains("SHOW")){
+						for(Key key : steamKeys){
+							System.out.println(key.toString());
+						}
+						Request request = new Request("WAIT");
+						requestQueue.put(request);
+					}else{
+						Request request = new Request("WAIT");
+						requestQueue.put(request);
 					}
-				}else{
-					Request request = new Request("WAIT");
-					requestQueue.put(request);
 				}
-				reader.close();
-				
 				//response
 				Response response = responseQueue.take();
+				//System.out.println(response.getType() + " : " + response.getUser() + " : " + response.getKeyName() + " : " + response.getBorrowedTime());
 				if(response.getUser() == null){
 					responseQueue.put(response);
 				}else if(response.getUser().getName().equals(this.getName())){
+					System.out.println(response.getType() + " : " + response.getUser() + " : " + response.getKeyName() + " : " + response.getBorrowedTime());
 					if(response.getType().equals("SUCCESS")){
+						System.out.println(id + "SUCCESS");
 						for(Key key: steamKeys){
 							if(key.getName().equals(keyName)){
 								for(User fUser : friends){
@@ -131,6 +154,7 @@ public class User implements Runnable{
 										key.setUser(friend);
 										key.setTimeout(response.getBorrowedTime());
 										key.setBorrowed(true);
+										System.out.println(key.toString());
 										//open socket and send key
 										sendKey(key, fUser.getId());
 										break;
@@ -142,8 +166,10 @@ public class User implements Runnable{
 					}else if(response.getType().equals("FAILED")){
 						System.out.println("Server failed to acknowledge.");
 					}else if(response.getType().equals("RECEIVE")){
+						System.out.println(id + " RECEIVE");
 						receiveKey();
 					}else if(response.getType().equals("TIMEOUT")){
+						System.out.println(id + " TIMEOUT");
 						String name = response.getKeyName();
 						int count = 0;
 						for(Key key: steamKeys){
@@ -154,21 +180,31 @@ public class User implements Runnable{
 							count++;
 						}
 					}else if(response.getType().equals("RETURN")){
+						System.out.println(id + " RETURN");
 						String name = response.getKeyName();
+						int count = 0;
 						for(Key key: steamKeys){
 							if(key.getName().equals(name)){
+								System.out.println(key);
 								key.setUser(key.getOwner());
 								key.setBorrowed(false);
 								key.setTimeout(null);
+								steamKeys.remove(count);
+								steamKeys.add(key);
+								System.out.println(steamKeys.get(count));
 								break;
 							}
+							count++;
 						}
 					}
 				}else{
 					responseQueue.put(response);
 				}
 				
-				
+				Thread.sleep(1000);
+				if(id!=0){
+					Thread.sleep(1000);
+				}
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -182,6 +218,7 @@ public class User implements Runnable{
 			int serverPort = 7896 + friendId;
 			//msg size in kilobytes
 			String data = Util.toString(key);
+			System.out.println("Sending Key: " + data);
 			s = new Socket("localhost", serverPort);    
 			DataOutputStream out = new DataOutputStream( s.getOutputStream());
 			out.writeUTF(data);
@@ -198,9 +235,9 @@ public class User implements Runnable{
 	
 	public void receiveKey(){
 		try{
-			int serverPort = 7896 + id;
+			//int serverPort = 7896 + id;
 			//System.out.println(serverPort);
-			ServerSocket listenSocket = new ServerSocket(serverPort);
+			//ServerSocket listenSocket = new ServerSocket(serverPort);
 			//Socket s = listenSocket.accept();  
 			//DataInputStream in = new DataInputStream( s.getInputStream());
 			while(true) {
@@ -209,6 +246,7 @@ public class User implements Runnable{
 					Socket s = listenSocket.accept();  
 					DataInputStream in = new DataInputStream( s.getInputStream());
 					String returned = in.readUTF();
+					System.out.println("Receiving Key: " + returned);
 					Key after = (Key)Util.fromString(returned);
 					System.out.println(id + ": " + "Received: " + after.toString());
 					steamKeys.add(after);
@@ -223,4 +261,7 @@ public class User implements Runnable{
 		}
 	}
 	
+	public String toString(){
+		return id + name;
+	}
 }
