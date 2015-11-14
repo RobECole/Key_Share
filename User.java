@@ -202,7 +202,7 @@ public class User implements Runnable{
 				}
 				
 				Thread.sleep(1000);
-				if(id!=0){
+				if(id==0){
 					Thread.sleep(1000);
 				}
 			}
