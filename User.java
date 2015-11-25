@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class User implements Runnable{
 	private int id;
@@ -85,9 +86,11 @@ public class User implements Runnable{
 			String friend = "";
 			String keyName = "";
 			int shareTime = 0;
+			boolean performed = false;
 			while(true){
 				//request
-				if(id == 0){
+				if(id == 0 && performed == false){
+					performed = true;
 					System.out.println(id + " Enter action: ");
 					action = reader.next();
 					friend = "";
@@ -139,68 +142,71 @@ public class User implements Runnable{
 					}
 				}
 				//response
-				Response response = responseQueue.take();
-				//System.out.println(response.getType() + " : " + response.getUser() + " : " + response.getKeyName() + " : " + response.getBorrowedTime());
-				if(response.getUser() == null){
-					responseQueue.put(response);
-				}else if(response.getUser().getName().equals(this.getName())){
-					System.out.println(response.getType() + " : " + response.getUser() + " : " + response.getKeyName() + " : " + response.getBorrowedTime());
-					if(response.getType().equals("SUCCESS")){
-						System.out.println(id + "SUCCESS");
-						for(Key key: steamKeys){
-							if(key.getName().equals(keyName)){
-								for(User fUser : friends){
-									if(fUser.getName().equals(friend)){
-										key.setUser(friend);
-										key.setTimeout(response.getBorrowedTime());
-										key.setBorrowed(true);
-										System.out.println(key.toString());
-										//open socket and send key
-										sendKey(key, fUser.getId());
-										break;
+				Response response = responseQueue.poll(10, TimeUnit.SECONDS);
+				if(response != null){
+					//System.out.println(response.getType() + " : " + response.getUser() + " : " + response.getKeyName() + " : " + response.getBorrowedTime());
+					if(response.getUser() == null){
+						responseQueue.put(response);
+					}else if(response.getUser().getName().equals(this.getName())){
+						System.out.println(response.getType() + " : " + response.getUser() + " : " + response.getKeyName() + " : " + response.getBorrowedTime());
+						if(response.getType().equals("SUCCESS")){
+							System.out.println(id + "SUCCESS");
+							for(Key key: steamKeys){
+								if(key.getName().equals(keyName)){
+									for(User fUser : friends){
+										if(fUser.getName().equals(friend)){
+											key.setUser(friend);
+											key.setTimeout(response.getBorrowedTime());
+											key.setBorrowed(true);
+											System.out.println(key.toString());
+											//open socket and send key
+											sendKey(key, fUser.getId());
+											break;
+										}
 									}
+									break;
 								}
-								break;
+							}
+						}else if(response.getType().equals("FAILED")){
+							System.out.println("Server failed to acknowledge.");
+						}else if(response.getType().equals("RECEIVE")){
+							System.out.println(id + " RECEIVE");
+							receiveKey();
+						}else if(response.getType().equals("TIMEOUT")){
+							performed = false;
+							System.out.println(id + " TIMEOUT");
+							String name = response.getKeyName();
+							int count = 0;
+							for(Key key: steamKeys){
+								if(key.getName().equals(name)){
+									steamKeys.remove(count);
+									break;
+								}
+								count++;
+							}
+						}else if(response.getType().equals("RETURN")){
+							performed = false;
+							System.out.println(id + " RETURN");
+							String name = response.getKeyName();
+							int count = 0;
+							for(Key key: steamKeys){
+								if(key.getName().equals(name)){
+									System.out.println(key);
+									key.setUser(key.getOwner());
+									key.setBorrowed(false);
+									key.setTimeout(null);
+									steamKeys.remove(count);
+									steamKeys.add(key);
+									System.out.println(steamKeys.get(count));
+									break;
+								}
+								count++;
 							}
 						}
-					}else if(response.getType().equals("FAILED")){
-						System.out.println("Server failed to acknowledge.");
-					}else if(response.getType().equals("RECEIVE")){
-						System.out.println(id + " RECEIVE");
-						receiveKey();
-					}else if(response.getType().equals("TIMEOUT")){
-						System.out.println(id + " TIMEOUT");
-						String name = response.getKeyName();
-						int count = 0;
-						for(Key key: steamKeys){
-							if(key.getName().equals(name)){
-								steamKeys.remove(count);
-								break;
-							}
-							count++;
-						}
-					}else if(response.getType().equals("RETURN")){
-						System.out.println(id + " RETURN");
-						String name = response.getKeyName();
-						int count = 0;
-						for(Key key: steamKeys){
-							if(key.getName().equals(name)){
-								System.out.println(key);
-								key.setUser(key.getOwner());
-								key.setBorrowed(false);
-								key.setTimeout(null);
-								steamKeys.remove(count);
-								steamKeys.add(key);
-								System.out.println(steamKeys.get(count));
-								break;
-							}
-							count++;
-						}
+					}else{
+						responseQueue.put(response);
 					}
-				}else{
-					responseQueue.put(response);
 				}
-				
 				Thread.sleep(1000);
 				if(id==0){
 					Thread.sleep(1000);

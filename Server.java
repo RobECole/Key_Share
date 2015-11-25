@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class Server implements Runnable{
 	private Map<User, Shared> timeouts;
@@ -23,9 +24,14 @@ public class Server implements Runnable{
 	public void run() {
 		try {
 			while(true){
-				Request r = requestQueue.take();
+				Request r = requestQueue.poll(10, TimeUnit.SECONDS);
 				Response response;
-				String rType = r.getType();
+				String rType = "";
+				if(r == null){
+					rType = "";
+				}else{
+					rType = r.getType();
+				}
 				boolean sharable = false;
 				if(rType.equals("SHARE")){
 					User userOne = r.getUserOne();
@@ -105,8 +111,8 @@ public class Server implements Runnable{
 					}
 					//send nothing back
 					//for(int i = 0; i < users.size(); i++){
-						response = new Response(null, "WAIT");
-						responseQueue.put(response);
+						//response = new Response(null, "WAIT");
+						//responseQueue.put(response);
 					//}
 				}
 				
