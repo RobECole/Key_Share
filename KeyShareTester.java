@@ -1,10 +1,9 @@
-import java.io.DataOutputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.Socket;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -18,11 +17,11 @@ public class KeyShareTester {
 		List<User> users = new ArrayList<>();
 		List<Thread> threads = new ArrayList<Thread>();
 		int numUsers = Integer.parseInt(args[0]);
-		Scanner reader = new Scanner(System.in);  // Reading from System.in
+		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));  // Reading from System.in
 		for(int i = 0 ;  i < numUsers; i++){
 			//Add Users
 			System.out.println("Username " + i + ": ");
-			String name = reader.next();
+			String name = reader.readLine();
 			User user = new User(i, name, responseQueue, requestQueue, reader);
 			Key key = new Key(i, name + i + i, name, new Date());
 			user.addSteamKey(key);
